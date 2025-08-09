@@ -1,0 +1,183 @@
+name: Build and Release
+
+# 触发条件：当推送tag时自动运行
+on:
+  push:
+    tags:
+      - 'v*'  # 匹配所有以v开头的tag，如v1.0.0
+
+  # 也可以手动触发
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write  # 需要写权限来创建release
+      
+    steps:
+    # 1. 检出代码
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 获取完整历史，用于生成changelog
+    
+    # 2. 设置Node.js环境 (如果是Node.js项目)
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+      if: hashFiles('package.json') != ''
+    
+    # 3. 设置Python环境 (如果是Python项目)
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
+      if: hashFiles('setup.py', 'pyproject.toml') != ''
+    
+    # 4. 设置Go环境 (如果是Go项目)
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+      if: hashFiles('go.mod') != ''
+    
+    # 5. 安装依赖和构建 (Node.js)
+    - name: Install dependencies and build (Node.js)
+      if: hashFiles('package.json') != ''
+      run: |
+        npm ci
+        npm run build --if-present
+    
+    # 6. 构建 (Go)
+    - name: Build (Go)
+      if: hashFiles('go.mod') != ''
+      run: |
+        mkdir -p dist
+        go build -o dist/ ./...
+    
+    # 7. 构建 (Python)
+    - name: Build (Python)
+      if: hashFiles('setup.py', 'pyproject.toml') != ''
+      run: |
+        python -m pip install build
+        python -m build
+        mkdir -p dist
+        cp dist/*.whl dist/*.tar.gz dist/ 2>/dev/null || true
+    
+    # 8. 创建压缩包
+    - name: Create release archive
+      run: |
+        # 确定要打包的目录
+        if [ -d "dist" ]; then
+          ARCHIVE_DIR="dist"
+        elif [ -d "build" ]; then
+          ARCHIVE_DIR="build"
+        elif [ -d "out" ]; then
+          ARCHIVE_DIR="out"
+        else
+          echo "No build directory found, creating one with current directory contents"
+          mkdir -p dist
+          # 复制重要文件到dist目录
+          cp -r . dist/ 2>/dev/null || true
+          # 排除一些不需要的文件/目录
+          rm -rf dist/.git dist/node_modules dist/.github dist/.gitignore 2>/dev/null || true
+          ARCHIVE_DIR="dist"
+        fi
+        
+        # 创建压缩包
+        zip -r release.zip $ARCHIVE_DIR
+        
+        # 创建tar.gz格式的压缩包
+        tar -czf release.tar.gz $ARCHIVE_DIR
+        
+        echo "ARCHIVE_DIR=$ARCHIVE_DIR" >> $GITHUB_ENV
+    
+    # 9. 生成changelog
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # 获取版本号
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        
+        # 生成changelog
+        CHANGELOG="## Release $VERSION
+
+### 📦 What's Included
+- Built artifacts ready for deployment
+- Source code snapshot
+
+### 🔄 Changes"
+        
+        # 获取上一个tag
+        PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+        
+        if [ -n "$PREV_TAG" ]; then
+          CHANGELOG="$CHANGELOG
+$(git log --pretty=format:'- %s (%h)' $PREV_TAG..HEAD)"
+        else
+          CHANGELOG="$CHANGELOG
+- Initial release"
+        fi
+        
+        CHANGELOG="$CHANGELOG
+
+### 📅 Release Information
+- **Version:** $VERSION
+- **Date:** $(date '+%Y-%m-%d %H:%M:%S UTC')
+- **Commit:** ${GITHUB_SHA:0:7}
+- **Archives:** release.zip, release.tar.gz
+
+### 📥 Download
+Choose the format that works best for you:
+- **ZIP:** Suitable for Windows and general use
+- **TAR.GZ:** Suitable for Unix/Linux systems
+
+---
+*This release was created automatically by GitHub Actions.*"
+        
+        # 保存changelog到文件
+        echo "$CHANGELOG" > changelog.md
+        
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        echo "$CHANGELOG" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+    
+    # 10. 创建GitHub Release
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ env.VERSION }}
+        name: Release ${{ env.VERSION }}
+        body: ${{ steps.changelog.outputs.changelog }}
+        files: |
+          release.zip
+          release.tar.gz
+        draft: false
+        prerelease: false
+        make_latest: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    # 11. 输出结果
+    - name: Output release info
+      run: |
+        echo "✅ Release created successfully!"
+        echo "🔗 View at: https://github.com/${{ github.repository }}/releases/tag/${{ env.VERSION }}"
+        echo "📦 Archive contents: ${{ env.ARCHIVE_DIR }}"
+        echo "📊 Archive sizes:"
+        ls -lh release.zip release.tar.gz
