@@ -1,0 +1,131 @@
+name: Build and Release to Target Repo
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+      target_repo:
+        description: 'Target repository (owner/repo)'
+        required: false
+        type: string
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # 1. 检出源码
+    - name: Checkout source code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    # 2. 设置Node.js环境（根据项目类型调整）
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+      if: hashFiles('package.json') != ''
+    
+    # 3. 安装依赖
+    - name: Install dependencies
+      run: npm ci
+      if: hashFiles('package.json') != ''
+    
+    # 4. 构建项目
+    - name: Build project
+      run: npm run build
+      if: hashFiles('package.json') != ''
+    
+    # 5. 创建发布包
+    - name: Create release package
+      run: |
+        # 确定版本号
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          VERSION="${{ github.event.inputs.version }}"
+        else
+          VERSION=${GITHUB_REF#refs/tags/}
+        fi
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        
+        # 创建发布目录
+        mkdir -p release-package
+        
+        # 复制构建产物（根据实际项目调整路径）
+        if [ -d "dist" ]; then
+          cp -r dist/* release-package/
+        elif [ -d "build" ]; then
+          cp -r build/* release-package/
+        elif [ -d "out" ]; then
+          cp -r out/* release-package/
+        else
+          echo "No build output found!"
+          exit 1
+        fi
+        
+        # 添加版本信息文件
+        echo "{\"version\":\"$VERSION\",\"build_date\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"commit\":\"$GITHUB_SHA\"}" > release-package/build-info.json
+        
+        # 创建压缩包
+        cd release-package
+        zip -r ../release.zip .
+        tar -czf ../release.tar.gz .
+        cd ..
+        
+        # 输出文件信息
+        echo "Release package contents:"
+        ls -la release-package/
+        echo "Archive files:"
+        ls -lh release.zip release.tar.gz
+    
+    # 6. 发布到目标仓库
+    - name: Create release in target repository
+      env:
+        GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        TARGET_REPO: ${{ secrets.TARGET_REPO || github.event.inputs.target_repo }}
+      run: |
+        # 验证目标仓库配置
+        if [ -z "$TARGET_REPO" ]; then
+          echo "Error: TARGET_REPO not configured"
+          exit 1
+        fi
+        
+        echo "Creating release in repository: $TARGET_REPO"
+        
+        # 生成发布说明
+        RELEASE_NOTES="## Release $VERSION
+
+### 📦 Build Information
+- **Source Repository**: ${{ github.repository }}
+- **Source Commit**: [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})
+- **Build Date**: $(date -u +%Y-%m-%d\ %H:%M:%S\ UTC)
+- **Workflow**: [${{ github.run_id }}](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+### 📥 Downloads
+- **release.zip**: Universal zip archive
+- **release.tar.gz**: Unix/Linux tar.gz archive
+
+### ✨ What's Included
+- Built and optimized production files
+- Build metadata (build-info.json)
+
+---
+*This release was automatically created from [${{ github.repository }}](https://github.com/${{ github.repository }}) by GitHub Actions.*"
+        
+        # 使用GitHub CLI创建release
+        gh release create "$VERSION" \
+          --repo "$TARGET_REPO" \
+          --title "Release $VERSION" \
+          --notes "$RELEASE_NOTES" \
+          release.zip \
+          release.tar.gz
+        
+        echo "✅ Release created successfully!"
+        echo "🔗 View at: https://github.com/$TARGET_REPO/releases/tag/$VERSION"
