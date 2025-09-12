@@ -21,6 +21,8 @@ RELEASE_TOKEN = 你的GitHub token
 TARGET_REPO = 目标仓库名称 (例如: username/releases)
 ```
 
+zolagz/trans_video_x
+
 ### 4. 添加工作流文件
 复制以下文件到源仓库的 `.github/workflows/` 目录：
 

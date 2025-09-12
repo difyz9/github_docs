@@ -6,8 +6,8 @@
 set -e
 
 # 配置变量 - 请根据您的项目修改这些值
-REPO="username/repository"        # 替换为您的GitHub仓库 (格式: owner/repo)
-ARCHIVE_PATH="./dist.zip"         # 替换为您的压缩包路径
+REPO="difyz9/hello_world"        # 替换为您的GitHub仓库 (格式: owner/repo)
+ARCHIVE_PATH="./trans-video-x-windows-x64.zip"         # 替换为您的压缩包路径
 DEFAULT_VERSION="v1.0.0"          # 默认版本号
 
 # 颜色输出
