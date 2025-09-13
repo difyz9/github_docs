@@ -1,22 +1,101 @@
-# 如何通过脚本发布压缩包到GitHub Release
+# 自动化Release发布脚本工具集
 
-本指南介绍了几种通过脚本将本地压缩包发布到GitHub Release的方法。
+本仓库提供了完整的自动化Release发布解决方案，支持GitHub和Gitee两大平台。包含多种实现方法，从简单的命令行脚本到复杂的API调用，满足不同场景的需求。
 
-## 方法一：使用GitHub CLI (推荐)
+## 📦 工具概览
 
-### 1. 安装GitHub CLI
+### GitHub Release 工具
+- `release.sh` - 使用GitHub CLI的完整发布脚本
+- `release-api.sh` - 使用GitHub API的发布脚本
+
+### Gitee Release 工具 ⭐
+- `gitee-release.sh` - 功能完整的Gitee发布脚本
+- `gitee-release-simple.sh` - 简化版快速发布脚本
+- `gitee-mcp-demo.sh` - MCP工具使用演示
+
+### 配置和文档
+- `.env.gitee.example` - Gitee配置文件模板
+- `dev03.md` - Gitee发布详细教程
+- `SETUP-GUIDE.md` - 项目设置指南
+
+## 🚀 快速开始
+
+### GitHub Release
+```bash
+# 使用GitHub CLI
+./release.sh
+
+# 使用API
+./release-api.sh
+```
+
+### Gitee Release
+```bash
+# 完整版本
+./gitee-release.sh -o username -r repository -f ./app.zip -v v1.0.0
+
+# 简化版本
+./gitee-release-simple.sh
+```
+
+## 🔧 Gitee Release 详细说明
+
+### 特性对比
+
+| 功能 | gitee-release.sh | gitee-release-simple.sh |
+|------|-----------------|------------------------|
+| 参数验证 | ✅ 完整 | ✅ 基础 |
+| 错误处理 | ✅ 详细 | ✅ 基础 |
+| 彩色输出 | ✅ 完整 | ✅ 简化 |
+| 交互确认 | ✅ 是 | ✅ 是 |
+| 版本检查 | ✅ 是 | ❌ 否 |
+| 命令行参数 | ✅ 支持 | ❌ 不支持 |
+| 帮助文档 | ✅ 详细 | ❌ 无 |
+
+### 使用前准备
+
+1. **获取Gitee访问令牌**
+   - 访问 [Gitee个人令牌](https://gitee.com/profile/personal_access_tokens)
+   - 创建新令牌，选择 `projects` 权限
+   - 复制生成的令牌
+
+2. **配置环境**
+   ```bash
+   # 方法1：环境变量
+   export GITEE_TOKEN="your_gitee_token"
+   
+   # 方法2：配置文件
+   cp .env.gitee.example .env
+   # 编辑.env文件设置您的配置
+   ```
+
+3. **准备发布文件**
+   ```bash
+   # 确保您的打包文件存在
+   ls -la ./your-package.zip
+   ```
+
+### 详细使用指南
+
+参见 [`dev03.md`](dev03.md) 获取完整的使用教程和最佳实践。
+
+## 📋 GitHub Release 方法
+
+### 方法一：使用GitHub CLI (推荐)
+
+#### 1. 安装GitHub CLI
 
 在macOS上：
 ```bash
 brew install gh
 ```
 
-### 2. 认证
+#### 2. 认证
 ```bash
 gh auth login
 ```
 
-### 3. 创建Release并上传文件的脚本
+#### 3. 创建Release并上传文件的脚本
 
 创建 `release.sh` 脚本：
 
@@ -39,20 +118,20 @@ gh release create "$VERSION" "$ARCHIVE_PATH" \
 echo "Release created successfully!"
 ```
 
-### 4. 使用方法
+#### 4. 使用方法
 ```bash
 chmod +x release.sh
 ./release.sh
 ```
 
-## 方法二：使用curl和GitHub API
+### 方法二：使用curl和GitHub API
 
-### 1. 获取GitHub Personal Access Token
+#### 1. 获取GitHub Personal Access Token
 
 1. 访问 GitHub Settings > Developer settings > Personal access tokens
 2. 创建新token，授予 `repo` 权限
 
-### 2. 创建API脚本
+#### 2. 创建API脚本
 
 创建 `release-api.sh` 脚本：
 
@@ -98,9 +177,9 @@ curl -s -X POST \
 echo "File uploaded successfully!"
 ```
 
-## 方法三：使用GitHub Actions (自动化)
+### 方法三：使用GitHub Actions (自动化)
 
-### 1. 创建GitHub Actions工作流
+#### 1. 创建GitHub Actions工作流
 
 创建 `.github/workflows/release.yml`：
 
@@ -136,146 +215,89 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-### 2. 触发Release
+#### 2. 触发Release
 ```bash
 git tag v1.0.0
 git push origin v1.0.0
 ```
 
-## 方法四：完整的自动化脚本示例
+## 💡 最佳实践和建议
 
-创建 `auto-release.sh`：
+### 通用建议
+1. **版本管理**：使用语义化版本号（如v1.0.0）
+2. **安全性**：将敏感信息（Token）存储在环境变量中
+3. **文档化**：提供详细的Release Notes
+4. **测试**：在正式发布前先测试脚本
+5. **备份**：保留重要版本的备份
+
+### GitHub vs Gitee 选择指南
+
+| 特性 | GitHub | Gitee |
+|------|--------|-------|
+| 国际化 | ✅ 全球访问 | ❌ 主要面向中国 |
+| 访问速度(中国) | ❌ 较慢 | ✅ 快速 |
+| 开源生态 | ✅ 丰富 | ⭐ 成长中 |
+| 企业支持 | ✅ 完善 | ✅ 本土化 |
+| API文档 | ✅ 详细 | ✅ 中文文档 |
+
+## 🔍 故障排除
+
+### 常见问题
+
+1. **Token权限不足**
+   - GitHub: 确保Token有`repo`权限
+   - Gitee: 确保Token有`projects`权限
+
+2. **文件上传失败**
+   - 检查文件路径是否正确
+   - 确认文件大小限制
+   - 验证网络连接
+
+3. **版本冲突**
+   - 检查版本号是否已存在
+   - 使用脚本的版本检查功能
+
+### 调试技巧
 
 ```bash
-#!/bin/bash
+# 启用详细输出
+set -x
 
-set -e  # 遇到错误时退出
-
-# 颜色输出
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-# 配置变量
-REPO="username/repository"
-ARCHIVE_NAME="release.zip"
-ARCHIVE_PATH="./$ARCHIVE_NAME"
-
-# 函数：打印彩色消息
-print_message() {
-    echo -e "${GREEN}[INFO]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# 检查必要工具
-check_requirements() {
-    if ! command -v gh &> /dev/null; then
-        print_error "GitHub CLI (gh) is not installed. Please install it first."
-        exit 1
-    fi
-    
-    if ! gh auth status &> /dev/null; then
-        print_error "GitHub CLI is not authenticated. Please run 'gh auth login' first."
-        exit 1
-    fi
-}
-
-# 创建压缩包
-create_archive() {
-    print_message "Creating archive..."
-    
-    # 这里添加您的文件打包逻辑
-    # 例如：
-    # zip -r "$ARCHIVE_PATH" ./dist
-    # 或者：
-    # tar -czf "release.tar.gz" ./dist
-    
-    if [ ! -f "$ARCHIVE_PATH" ]; then
-        print_error "Archive creation failed or file not found: $ARCHIVE_PATH"
-        exit 1
-    fi
-    
-    print_message "Archive created: $ARCHIVE_PATH"
-}
-
-# 获取版本号
-get_version() {
-    # 方法1：从git tag获取
-    VERSION=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-    
-    if [ -z "$VERSION" ]; then
-        # 方法2：手动输入
-        read -p "Enter version (e.g., v1.0.0): " VERSION
-    fi
-    
-    if [ -z "$VERSION" ]; then
-        print_error "Version is required"
-        exit 1
-    fi
-    
-    print_message "Using version: $VERSION"
-}
-
-# 创建Release
-create_release() {
-    print_message "Creating GitHub Release..."
-    
-    RELEASE_NOTES="Release $VERSION
-
-## Changes
-- Add your release notes here
-
-## Download
-- Download the archive from the assets below"
-    
-    if gh release create "$VERSION" "$ARCHIVE_PATH" \
-        --repo "$REPO" \
-        --title "Release $VERSION" \
-        --notes "$RELEASE_NOTES"; then
-        print_message "Release created successfully!"
-        print_message "View at: https://github.com/$REPO/releases/tag/$VERSION"
-    else
-        print_error "Failed to create release"
-        exit 1
-    fi
-}
-
-# 主函数
-main() {
-    print_message "Starting release process..."
-    
-    check_requirements
-    get_version
-    create_archive
-    create_release
-    
-    print_message "Release process completed!"
-}
-
-# 执行主函数
-main "$@"
+# 检查API响应
+curl -v -H "Authorization: token $TOKEN" "https://api.github.com/user"
 ```
 
-## 使用建议
+## 🤝 贡献指南
 
-1. **推荐使用GitHub CLI**：最简单、最可靠的方法
-2. **设置环境变量**：将敏感信息（如token）存储在环境变量中
-3. **版本管理**：使用git tags来管理版本号
-4. **自动化**：考虑使用GitHub Actions进行完全自动化
+欢迎提交Issue和Pull Request来改进这些脚本！
 
-## 注意事项
+### 开发环境设置
+```bash
+git clone https://github.com/your-username/github_docs
+cd github_docs
+chmod +x *.sh
+```
 
-- 确保有仓库的写权限
-- Token需要适当的权限范围
-- 压缩包路径要正确
-- 版本号要唯一，不能重复
+### 测试
+```bash
+# 测试GitHub脚本
+./release.sh --help
 
-选择适合您需求的方法，根据具体情况调整脚本中的配置变量。
+# 测试Gitee脚本  
+./gitee-release.sh --help
+```
+
+## 📚 相关资源
+
+- [GitHub API文档](https://docs.github.com/en/rest)
+- [Gitee API文档](https://gitee.com/api/v5/swagger)
+- [GitHub CLI文档](https://cli.github.com/)
+- [语义化版本规范](https://semver.org/)
+
+---
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+
+## ⭐ 如果这个项目对您有帮助，请给个Star！
